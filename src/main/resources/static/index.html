@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>康悦医院智能客服</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.2.31/dist/vue.global.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            transition: background-color 0.3s ease;
+        }
+
+        /* 滚动条样式优化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 3px;
+            transition: background 0.2s ease;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+        }
+
+        .dark ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+
+        /* 输入框自适应高度 - 核心优化：消除空白 */
+        textarea {
+            min-height: 44px;
+            max-height: 200px;
+            transition: height 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            line-height: 1.5;
+            box-sizing: border-box; /* 关键：包含内边距计算 */
+        }
+
+        /* 加载动画优化 */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0.4;
+                transform: scale(0.95);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+        }
+
+        .animate-pulse {
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        .delay-100 {
+            animation-delay: 0.1s;
+        }
+
+        .delay-200 {
+            animation-delay: 0.2s;
+        }
+
+        /* 打字机效果优化 */
+        .char-animate {
+            animation: charFadeIn 0.1s ease-out forwards;
+            animation-fill-mode: both;
+        }
+
+        @keyframes charFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(1px);
+                filter: blur(0.5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+                filter: blur(0);
+            }
+        }
+
+        /* 消息进入动画 */
+        .message-item {
+            animation: messageSlideIn 0.2s ease-out forwards;
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        @keyframes messageSlideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 按钮hover动画 */
+        .btn-transition {
+            transition: all 0.2s ease;
+        }
+
+        /* 骨架屏背景优化 */
+        .chat-bg {
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .dark .chat-bg {
+            background-image: radial-gradient(#374151 1px, transparent 1px);
+        }
+
+        /* 修复原样式缺失问题 */
+        .hover\:bg-gray-750:hover {
+            background-color: #2a303c;
+        }
+
+        /* 文本渲染优化 */
+        .chat-text {
+            font-smoothing: antialiased;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+    </style>
+</head>
+<body class="transition-colors duration-300" :class="{ dark: darkMode }">
+<div id="app" class="flex flex-col h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <!-- 顶部导航栏 -->
+    <header class="bg-white dark:bg-gray-800 shadow-md py-3 px-4 flex items-center justify-between transition-colors duration-300">
+        <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white">
+                <i class="fas fa-hospital"></i>
+            </div>
+            <div class="text-xl font-bold text-blue-600 dark:text-blue-400">康悦医院智能客服</div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button
+                    @click="startNewConversation"
+                    class="ml-2 p-2 rounded-lg bg-green-500 hover:bg-green-600 text-white btn-transition flex items-center justify-center"
+                    style="width: 44px; height: 44px"
+                    title="新建会话"
+            >
+                <i class="fas fa-plus"></i>
+            </button>
+            <button
+                    @click="toggleDarkMode"
+                    class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 btn-transition"
+                    title="切换深色模式"
+            >
+                <i :class="darkMode ? 'fas fa-moon text-gray-300' : 'fas fa-sun text-gray-600'"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 聊天内容区域 -->
+    <main class="flex-1 overflow-y-auto p-4 space-y-4 chat-bg" ref="chatContainer" :class="{ 'bg-gray-50 dark:bg-gray-900': true }">
+        <!-- 空状态提示 -->
+        <div v-if="messages.length === 0" class="flex flex-col items-center justify-center h-full py-10">
+            <div class="w-24 h-24 rounded-full bg-blue-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                <i class="fas fa-comments text-4xl text-blue-500 dark:text-blue-400"></i>
+            </div>
+            <p class="text-gray-500 dark:text-gray-400 text-lg">暂无聊天记录，开始您的咨询吧</p>
+        </div>
+
+        <div v-for="(message, index) in messages" :key="index" class="max-w-3xl mx-auto message-item" :style="{animationDelay: `${index * 0.05}s`}">
+            <div :class="['flex', message.role === 'user' ? 'justify-end' : 'justify-start']">
+                <div :class="['flex items-start space-x-3', message.role === 'user' ? 'flex-row-reverse space-x-reverse' : '']">
+                    <div :class="[
+                        'w-10 h-10 rounded-full flex items-center justify-center shadow-sm btn-transition',
+                        message.role === 'user'
+                            ? 'bg-blue-500 text-white hover:bg-blue-600'
+                            : 'bg-green-50 dark:bg-gray-700 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-gray-600'
+                    ]">
+                        <i :class="message.role === 'user' ? 'fas fa-user text-lg' : 'fas fa-robot text-lg'"></i>
+                    </div>
+                    <div :class="[
+                        'p-4 rounded-2xl max-w-lg shadow-sm btn-transition chat-text',
+                        message.role === 'user'
+                            ? 'bg-blue-500 text-white hover:bg-blue-600'
+                            : darkMode
+                                ? 'bg-gray-800 text-gray-100 border border-gray-700 hover:bg-gray-750'
+                                : 'bg-white text-gray-800 border border-gray-100 hover:bg-gray-50'
+                    ]" style="border-radius: 18px;">
+                        <!-- 加载动画 -->
+                        <div v-if="message.role === 'assistant' && message.isLoading" class="flex space-x-2 p-2">
+                            <div :class="['w-2.5 h-2.5 rounded-full', darkMode ? 'bg-gray-400' : 'bg-gray-300', 'animate-pulse']"></div>
+                            <div :class="['w-2.5 h-2.5 rounded-full', darkMode ? 'bg-gray-400' : 'bg-gray-300', 'animate-pulse delay-100']"></div>
+                            <div :class="['w-2.5 h-2.5 rounded-full', darkMode ? 'bg-gray-400' : 'bg-gray-300', 'animate-pulse delay-200']"></div>
+                        </div>
+                        <div v-else class="whitespace-pre-wrap leading-relaxed">
+                            <!-- 优化的打字效果渲染 -->
+                            <template v-for="(char, charIndex) in message.content" :key="charIndex">
+                                <span v-if="charIndex < message.visibleChars"
+                                      class="char-animate"
+                                      :style="{animationDelay: `${charIndex * 0.005}s`}">
+                                    {{ char }}
+                                </span>
+                                <span v-else class="opacity-0">{{ char }}</span>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 输入框区域 -->
+    <footer :class="['border-t p-4', darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200']">
+        <div class="max-w-3xl mx-auto relative">
+            <div class="flex items-end space-x-2">
+                <textarea
+                        v-model="userInput"
+                        @keydown.enter.exact.prevent="sendMessage"
+                        @keydown.ctrl.enter.exact="sendMessage"
+                        @keydown.esc.exact="stopResponse"
+                        placeholder="输入您的问题，按 Enter 发送，按 Esc 停止回复..."
+                        :class="[
+                            'flex-1 border rounded-xl py-3 px-4 pr-12 focus:outline-none focus:ring-2 resize-none btn-transition',
+                            darkMode
+                                ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-400 placeholder-gray-400'
+                                : 'border-gray-300 focus:ring-blue-500 focus:border-transparent'
+                        ]"
+                        rows="1"
+                        ref="textarea"
+                        @input="handleTextareaInput"
+                        @focus="adjustTextareaHeight"
+                        @blur="adjustTextareaHeight"
+                        @keydown="adjustTextareaHeight"
+                ></textarea>
+                <!-- 发送/停止按钮 -->
+                <button
+                        @click="isLoading ? stopResponse() : sendMessage()"
+                        :disabled="!userInput.trim() && !isLoading"
+                        :class="[
+                            'p-3 rounded-full btn-transition flex-shrink-0',
+                            isLoading
+                                ? 'bg-red-500 hover:bg-red-600 text-white'
+                                : 'bg-blue-500 hover:bg-blue-600 text-white',
+                            'disabled:opacity-50 disabled:cursor-not-allowed'
+                        ]"
+                        style="width: 48px; height: 48px"
+                        :title="isLoading ? '停止回复 (Esc)' : '发送消息 (Enter)'"
+                >
+                    <i :class="isLoading ? 'fas fa-stop text-lg' : 'fas fa-paper-plane text-lg'"></i>
+                </button>
+            </div>
+            <!-- 底部提示文字 -->
+            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400 flex justify-between items-center">
+                <span>💡 支持健康咨询、就医指引、科室查询、预约挂号等服务</span>
+                <span v-if="memoeryId">会话ID: {{ memoeryId.slice(-6) }}</span>
+            </div>
+        </div>
+    </footer>
+</div>
+
+<script>
+    const {createApp, ref, nextTick, onMounted, watch, onUnmounted} = Vue;
+
+    createApp({
+        setup() {
+            const messages = ref([]);
+            const userInput = ref('');
+            const isLoading = ref(false);
+            const chatContainer = ref(null);
+            const textarea = ref(null);
+            const darkMode = ref(false);
+
+            const memoeryId = ref(Date.now().toString());
+            let controller = null;
+            let typingAnimationFrame = null;
+            let resizeObserver = null;
+            let inputDebounceTimer = null;
+            let lastTypingTime = 0;
+
+            // 打字速度配置
+            const TYPING_SPEED = 8;      // 字符/秒（越大越快）
+            const MIN_INTERVAL = 16;     // 最小渲染间隔(ms)
+
+            // ========== 核心优化：输入框高度计算 ==========
+            const adjustTextareaHeight = () => {
+                nextTick(() => {
+                    const textareaEl = textarea.value;
+                    if (!textareaEl) return;
+
+                    // 关键：先保存当前的scrollTop，防止光标位置跳动
+                    const currentScrollTop = textareaEl.scrollTop;
+
+                    // 1. 重置高度为最小高度，确保计算基准准确
+                    textareaEl.style.height = '44px';
+
+                    // 2. 创建临时元素精确计算文本高度（核心解决空白问题）
+                    const tempDiv = document.createElement('div');
+                    // 复制所有影响文本布局的样式
+                    const computedStyle = window.getComputedStyle(textareaEl);
+                    tempDiv.style.position = 'absolute';
+                    tempDiv.style.visibility = 'hidden';
+                    tempDiv.style.whiteSpace = 'pre-wrap';
+                    tempDiv.style.wordWrap = 'break-word';
+                    tempDiv.style.fontFamily = computedStyle.fontFamily;
+                    tempDiv.style.fontSize = computedStyle.fontSize;
+                    tempDiv.style.lineHeight = computedStyle.lineHeight;
+                    tempDiv.style.padding = computedStyle.padding;
+                    tempDiv.style.width = computedStyle.width;
+                    tempDiv.style.boxSizing = 'border-box';
+                    tempDiv.style.overflow = 'hidden';
+
+                    // 设置和输入框相同的内容
+                    tempDiv.textContent = textareaEl.value || textareaEl.placeholder;
+
+                    // 添加到文档流进行计算
+                    document.body.appendChild(tempDiv);
+
+                    // 3. 精确计算所需高度
+                    const contentHeight = tempDiv.offsetHeight;
+                    document.body.removeChild(tempDiv);
+
+                    // 4. 计算最终高度：贴合内容，无空白
+                    const minHeight = 44;  // 最小高度
+                    const maxHeight = 200; // 最大高度
+                    // 关键：使用offsetHeight而非scrollHeight，避免包含隐藏的滚动区域
+                    const textContentHeight = Math.max(minHeight, Math.min(contentHeight, maxHeight));
+
+                    // 5. 只在高度变化时才更新，避免不必要的重绘
+                    if (parseInt(textareaEl.style.height) !== textContentHeight) {
+                        textareaEl.style.height = `${textContentHeight}px`;
+                    }
+
+                    // 6. 恢复滚动位置，防止光标跳动
+                    textareaEl.scrollTop = currentScrollTop;
+                });
+            };
+
+            // 输入防抖优化（缩短防抖时间，更灵敏）
+            const handleTextareaInput = () => {
+                clearTimeout(inputDebounceTimer);
+                // 缩短防抖时间到10ms，几乎实时响应
+                inputDebounceTimer = setTimeout(() => {
+                    adjustTextareaHeight();
+                }, 10);
+            };
+
+            // 智能滚动优化
+            const scrollToBottom = (force = false) => {
+                nextTick(() => {
+                    if (!chatContainer.value) return;
+
+                    const container = chatContainer.value;
+                    const scrollThreshold = 20;
+                    const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < scrollThreshold;
+
+                    if (force || isAtBottom) {
+                        requestAnimationFrame(() => {
+                            container.scrollTo({
+                                top: container.scrollHeight,
+                                behavior: 'smooth'
+                            });
+                        });
+                    }
+                });
+            };
+
+            // 切换暗黑模式
+            const toggleDarkMode = () => {
+                darkMode.value = !darkMode.value;
+                localStorage.setItem('darkMode', darkMode.value);
+                document.body.classList.toggle('dark', darkMode.value);
+            };
+
+            // 新建会话
+            const startNewConversation = () => {
+                if (typingAnimationFrame) {
+                    cancelAnimationFrame(typingAnimationFrame);
+                    typingAnimationFrame = null;
+                }
+
+                messages.value = [];
+                memoeryId.value = Date.now().toString();
+
+                const welcomeMsg = {
+                    role: 'assistant',
+                    content: '你好呀～我是康悦医院的智能客服小康🐾，可以为你解答健康问题、协助就医流程哦，有什么需要帮助的吗？',
+                    isLoading: false,
+                    visibleChars: 0
+                };
+                messages.value.push(welcomeMsg);
+
+                nextTick(() => {
+                    animateTyping(0);
+                    scrollToBottom(true);
+                });
+
+                nextTick(() => {
+                    if (textarea.value) {
+                        textarea.value.focus();
+                    }
+                });
+            };
+
+            // 打字动画函数
+            const animateTyping = (messageIndex) => {
+                const message = messages.value[messageIndex];
+                if (!message || message.visibleChars >= message.content.length) {
+                    typingAnimationFrame = null;
+                    return;
+                }
+
+                const now = performance.now();
+                if (!lastTypingTime || now - lastTypingTime >= MIN_INTERVAL) {
+                    lastTypingTime = now;
+
+                    const charsToAdd = Math.max(1, Math.floor(TYPING_SPEED * MIN_INTERVAL / 1000));
+                    message.visibleChars = Math.min(message.visibleChars + charsToAdd, message.content.length);
+
+                    scrollToBottom();
+                }
+
+                typingAnimationFrame = requestAnimationFrame(() => animateTyping(messageIndex));
+            };
+
+            // 发送消息
+            const sendMessage = async () => {
+                const trimmedInput = userInput.value.trim();
+                if (!trimmedInput || isLoading.value) return;
+
+                if (controller) {
+                    controller.abort();
+                }
+                controller = new AbortController();
+
+                const userMessage = {
+                    role: 'user',
+                    content: trimmedInput,
+                    isLoading: false,
+                    visibleChars: trimmedInput.length
+                };
+                messages.value.push(userMessage);
+
+                const assistantMessage = {
+                    role: 'assistant',
+                    content: '',
+                    isLoading: true,
+                    visibleChars: 0
+                };
+                messages.value.push(assistantMessage);
+
+                userInput.value = '';
+                adjustTextareaHeight(); // 发送后立即调整高度
+                scrollToBottom(true);
+
+                isLoading.value = true;
+
+                try {
+                    const response = await fetch(`/chat?message=${encodeURIComponent(userMessage.content)}&memoryId=${memoeryId.value}`, {
+                        signal: controller.signal
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder('utf-8');
+                    let buffer = '';
+                    const messageIndex = messages.value.length - 1;
+
+                    if (typingAnimationFrame) {
+                        cancelAnimationFrame(typingAnimationFrame);
+                        typingAnimationFrame = null;
+                    }
+
+                    while (true) {
+                        const {done, value} = await reader.read();
+                        if (done) break;
+
+                        const chunk = decoder.decode(value, {stream: true});
+                        buffer += chunk;
+
+                        messages.value[messageIndex].content = buffer;
+                        messages.value[messageIndex].isLoading = false;
+
+                        if (!typingAnimationFrame) {
+                            animateTyping(messageIndex);
+                        }
+
+                        scrollToBottom();
+                    }
+
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        console.error('请求出错:', error);
+                        const lastMessage = messages.value[messages.value.length - 1];
+                        lastMessage.content = '抱歉，请求过程中出现错误: ' + error.message;
+                        lastMessage.visibleChars = lastMessage.content.length;
+                        lastMessage.isLoading = false;
+                    }
+                } finally {
+                    const lastMessage = messages.value[messages.value.length - 1];
+                    if (lastMessage) {
+                        lastMessage.isLoading = false;
+                        if (lastMessage.visibleChars < lastMessage.content.length) {
+                            lastMessage.visibleChars = lastMessage.content.length;
+                        }
+                    }
+
+                    isLoading.value = false;
+                    controller = null;
+
+                    if (typingAnimationFrame) {
+                        cancelAnimationFrame(typingAnimationFrame);
+                        typingAnimationFrame = null;
+                    }
+
+                    scrollToBottom();
+                }
+            };
+
+            // 停止响应
+            const stopResponse = () => {
+                if (controller) {
+                    controller.abort();
+
+                    const lastMessage = messages.value[messages.value.length - 1];
+                    if (lastMessage) {
+                        lastMessage.isLoading = false;
+                        lastMessage.visibleChars = lastMessage.content.length;
+                    }
+
+                    isLoading.value = false;
+                    controller = null;
+
+                    if (typingAnimationFrame) {
+                        cancelAnimationFrame(typingAnimationFrame);
+                        typingAnimationFrame = null;
+                    }
+
+                    nextTick(() => {
+                        if (textarea.value) {
+                            textarea.value.focus();
+                        }
+                    });
+                }
+            };
+
+            // 初始化
+            onMounted(() => {
+                const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                darkMode.value = savedDarkMode || (localStorage.getItem('darkMode') === null && prefersDark);
+                document.body.classList.toggle('dark', darkMode.value);
+
+                // 初始化输入框高度（关键：确保初始无空白）
+                adjustTextareaHeight();
+
+                nextTick(() => {
+                    startNewConversation();
+                });
+
+                window.addEventListener('resize', () => scrollToBottom(false));
+
+                // 增强的ResizeObserver：不仅监听尺寸，还监听内容变化
+                if (textarea.value && window.ResizeObserver) {
+                    resizeObserver = new ResizeObserver((entries) => {
+                        for (const entry of entries) {
+                            if (entry.contentBoxSize) {
+                                requestAnimationFrame(adjustTextareaHeight);
+                            }
+                        }
+                    });
+                    resizeObserver.observe(textarea.value);
+                }
+            });
+
+            // 清理资源
+            onUnmounted(() => {
+                window.removeEventListener('resize', scrollToBottom);
+
+                clearTimeout(inputDebounceTimer);
+                if (typingAnimationFrame) {
+                    cancelAnimationFrame(typingAnimationFrame);
+                }
+
+                if (resizeObserver) {
+                    resizeObserver.disconnect();
+                }
+
+                if (controller) {
+                    controller.abort();
+                }
+            });
+
+            // 监听消息变化
+            watch(messages, () => {
+                requestAnimationFrame(() => scrollToBottom(false));
+            }, {deep: true});
+
+            // 监听输入内容变化，确保高度实时调整
+            watch(userInput, () => {
+                handleTextareaInput();
+            });
+
+            // 监听暗黑模式变化
+            watch(darkMode, (newVal) => {
+                document.body.classList.toggle('dark', newVal);
+                scrollToBottom();
+                // 切换暗黑模式后重新计算高度
+                adjustTextareaHeight();
+            });
+
+            return {
+                messages,
+                userInput,
+                isLoading,
+                darkMode,
+                chatContainer,
+                textarea,
+                sendMessage,
+                stopResponse,
+                toggleDarkMode,
+                adjustTextareaHeight,
+                handleTextareaInput,
+                startNewConversation,
+                memoeryId
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
