@@ -14,7 +14,7 @@ import reactor.core.publisher.Flux;
         //chatMemory = "chatMemory",
         chatMemoryProvider = "chatMemoryProvider",
         contentRetriever = "contentRetriever",
-        tools = {"appointmentTool", "feedbackTool"}
+        tools = {"appointmentTool", "feedbackTool", "patientRecordTool"}
 )
 public interface ConsultantService {
     String chat(String message);
