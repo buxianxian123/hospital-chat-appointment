@@ -17,7 +17,7 @@ public class PatientRecordTool {
     private PatientRecordService patientRecordService;
 
     @Tool("保存或更新患者健康档案")
-    public void saveOrUpdatePatientRecord(
+    public String saveOrUpdatePatientRecord(
             @P("患者手机号") String patientPhone,
             @P("患者姓名") String patientName,
             @P("年龄") Integer age,
@@ -47,6 +47,7 @@ public class PatientRecordTool {
                 .build();
 
         patientRecordService.saveOrUpdate(record);
+        return "健康档案已成功保存/更新。患者：" + patientName + "（" + patientPhone + "），年龄：" + age + "，性别：" + gender;
     }
 
     @Tool("查询患者健康档案")

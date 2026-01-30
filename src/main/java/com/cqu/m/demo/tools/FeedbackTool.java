@@ -16,7 +16,7 @@ public class FeedbackTool {
     private FeedbackService feedbackService;
 
     @Tool("提交服务建议或反馈")
-    public void insertFeedback(
+    public String insertFeedback(
             @P("对话 memoryId") String memoryId,
             @P("用户手机号，可选") String patientPhone,
             @P("反馈内容") String content
@@ -28,5 +28,6 @@ public class FeedbackTool {
                 .createTime(LocalDateTime.now())
                 .build();
         feedbackService.insert(feedback);
+        return "反馈已成功提交，感谢您的宝贵意见！我们会认真对待每一条反馈，持续改进服务质量。";
     }
 }

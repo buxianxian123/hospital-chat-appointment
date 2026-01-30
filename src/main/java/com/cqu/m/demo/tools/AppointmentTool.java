@@ -17,7 +17,7 @@ public class AppointmentTool {
     @Autowired
     private AppointmentService appointmentService;
     @Tool("预约咨询服务")
-    public void insertAppointment(
+    public String insertAppointment(
             @P("患者姓名") String patientName,
             @P("患者手机号码") String patientPhone,
             @P("科室名称") String deptName,
@@ -38,6 +38,7 @@ public class AppointmentTool {
 
             log.info(appointment.toString());
             appointmentService.insertAppointment(appointment);
+            return "预约成功！预约号：" + appointmentNo + "，患者：" + patientName + "，科室：" + deptName + "，医生：" + doctorName + "，时间：" + appointmentDate + " " + appointmentTime;
         }
 
     }
@@ -46,15 +47,16 @@ public class AppointmentTool {
         return appointmentService.findAppointmentByPatientPhone(patientPhone);
     }
     @Tool("取消预约")
-    public void cancelAppointment(
+    public String cancelAppointment(
             @P("预约手机号") String patientPhone,
             @P("取消原因") String cancelReason
     ) {
 
         appointmentService.cancelAppointment(patientPhone, cancelReason);
+        return "预约已成功取消。取消原因：" + cancelReason;
     }
     @Tool("修改预约信息")
-    public void updateAppointment(
+    public String updateAppointment(
             @P("修改后患者姓名") String patientName,
             @P("修改后患者手机号码") String patientPhone,
             @P("修改后科室名称") String deptName,
@@ -64,15 +66,20 @@ public class AppointmentTool {
             @P("修改后预约备注") String remark
     ) {
         Appointment appointment = appointmentService.findAppointmentByPatientPhone(patientPhone);
+        if (appointment == null) {
+            return "未找到该手机号的预约记录，无法修改";
+        }
         appointment.setPatientName(patientName);
+        appointment.setDeptName(deptName);
+        appointment.setDoctorName(doctorName);
+        appointment.setAppointmentDate(LocalDate.parse(appointmentDate));
+        appointment.setAppointmentTime(appointmentTime);
         appointment.setRemark(remark);
-
-
-
 
         log.info("修改预约信息");
         log.info(appointment.toString());
         appointmentService.updateAppointment(appointment);
+        return "预约信息已成功修改。患者：" + patientName + "，科室：" + deptName + "，医生：" + doctorName + "，时间：" + appointmentDate + " " + appointmentTime;
     }
 
 
